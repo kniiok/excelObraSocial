@@ -285,26 +285,6 @@
       return resultado;
     }
 
-    function deepCloneStyle(style) {
-      return style ? JSON.parse(JSON.stringify(style)) : undefined;
-    }
-
-    function setCell(worksheet, address, type, value, style) {
-      const cell = { t: type, v: value };
-      if (style) {
-        cell.s = deepCloneStyle(style);
-      }
-      worksheet[address] = cell;
-    }
-
-    function roundCurrency(value) {
-      const numericValue = Number.parseFloat(value);
-      if (!Number.isFinite(numericValue)) {
-        return 0;
-      }
-      return Math.round(numericValue * 100) / 100;
-    }
-
     const clients = {
       previous: [],
       current: []
@@ -433,10 +413,10 @@
 
     function getFormData() {
       const rawDate = dateInput.value;
-      const nombre = sanitizeText(document.getElementById('nombre').value);
-      const afiliado = sanitizeText(document.getElementById('afiliado').value);
-      const codigo = sanitizeText(document.getElementById('codigo').value);
-      const descripcion = sanitizeText(document.getElementById('descripcion').value);
+      const nombre = document.getElementById('nombre').value.trim();
+      const afiliado = document.getElementById('afiliado').value.trim();
+      const codigo = document.getElementById('codigo').value.trim();
+      const descripcion = document.getElementById('descripcion').value.trim();
       const valor = parseFloat(document.getElementById('valor').value);
 
       if (!rawDate || !nombre || !afiliado || !codigo || !descripcion || Number.isNaN(valor)) {
@@ -449,7 +429,7 @@
         afiliado,
         codigo,
         descripcion,
-        valor: roundCurrency(valor)
+        valor
       };
     }
 
