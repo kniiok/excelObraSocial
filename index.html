@@ -2,201 +2,474 @@
 <html lang="es">
 
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>FactuExcel</title>
-  <link rel="shortcut icon" href="https://img.icons8.com/?size=100&id=13654&format=png&color=000000" type="image/x-icon">
-
-  <!-- Incluimos SheetJS para crear el Excel -->
+  <link rel="shortcut icon"
+    href="https://img.icons8.com/?size=100&id=13654&format=png&color=000000" type="image/x-icon" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Work+Sans:wght@400;500;600&display=swap"
+    rel="stylesheet">
   <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css" />
 </head>
 
 <body>
-  <div id="form-container">
-    <h1 id="title">Cliente 1</h1>
-    <form id="client-form">
-      <div>
-        <label for="fecha">Fecha:</label>
-        <input type="date" id="fecha" required>
-<script>
-(function () {
-  const hoy = new Date();
-  let year = hoy.getFullYear();
-  let month = hoy.getMonth(); // 0 = enero
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-mark">FE</span>
+        <div class="brand-copy">
+          <p class="brand-kicker">Gestión médica</p>
+          <h1>FactuExcel</h1>
+        </div>
+      </div>
+      <p class="brand-description">
+        Cargá tus prestaciones desde el teléfono y generá un Excel prolijo, listo para enviar a tu obra social.
+      </p>
+    </header>
 
-  if (month === 0) {
-    month = 11;
-    year -= 1;
-  } else {
-    month -= 1;
-  }
+    <main class="surface">
+      <section class="period-panel" aria-labelledby="period-heading">
+        <div class="panel-heading">
+          <h2 id="period-heading">Periodo de facturación</h2>
+          <span class="period-label" id="period-label"></span>
+        </div>
+        <div class="period-toggle" role="tablist" aria-label="Seleccioná el periodo">
+          <button type="button" class="period-option is-active" data-period="previous" role="tab"
+            aria-selected="true">
+            Mes anterior
+          </button>
+          <button type="button" class="period-option" data-period="current" role="tab" aria-selected="false">
+            Mes actual
+          </button>
+        </div>
+        <p class="period-summary" id="period-summary"></p>
+      </section>
 
-  const minDate = new Date(year, month, 1);
-  const maxDate = new Date(year, month + 1, 0);
+      <section class="form-panel">
+        <header class="form-heading">
+          <h2 id="form-title">Nuevo cliente</h2>
+          <p>Ingresá los datos tal como aparecerán en el comprobante.</p>
+        </header>
+        <form id="client-form" novalidate>
+          <div class="field">
+            <label for="fecha">Fecha</label>
+            <input type="date" id="fecha" name="fecha" required />
+            <small class="field-hint" id="fecha-hint"></small>
+          </div>
+          <div class="field">
+            <label for="nombre">Nombre y Apellido</label>
+            <input type="text" id="nombre" name="nombre" autocomplete="name" required
+              placeholder="Ej. Juan Pérez" />
+          </div>
+          <div class="field-group">
+            <div class="field">
+              <label for="afiliado">Número de afiliado</label>
+              <input type="text" id="afiliado" name="afiliado" inputmode="numeric" required placeholder="000000" />
+            </div>
+            <div class="field">
+              <label for="codigo">Código</label>
+              <input type="text" id="codigo" name="codigo" inputmode="numeric" required placeholder="0000" />
+            </div>
+          </div>
+          <div class="field">
+            <label for="descripcion">Descripción</label>
+            <textarea id="descripcion" name="descripcion" rows="2" required
+              placeholder="Detalle de la prestación"></textarea>
+          </div>
+          <div class="field">
+            <label for="valor">Valor</label>
+            <input type="number" id="valor" name="valor" step="0.01" inputmode="decimal" required
+              placeholder="0.00" />
+          </div>
+          <div class="form-actions">
+            <button type="button" id="next-btn" class="btn primary">Guardar y cargar otro</button>
+            <button type="button" id="finish-btn" class="btn secondary">Finalizar y generar Excel</button>
+          </div>
+        </form>
+      </section>
 
-  function formatDate(d) {
-    const m = (d.getMonth() + 1).toString().padStart(2, '0');
-    const day = d.getDate().toString().padStart(2, '0');
-    return `${d.getFullYear()}-${m}-${day}`;
-  }
+      <section class="list-panel" aria-live="polite">
+        <header class="list-heading">
+          <h2>Clientes cargados</h2>
+            <div class="list-total">
+              <span>Total estimado</span>
+              <strong id="client-total">AR$ 0,00</strong>
+          </div>
+        </header>
+        <div id="client-list" class="client-list">
+          <p class="empty-state">Todavía no cargaste ningún cliente.</p>
+        </div>
+      </section>
 
-  const inputFecha = document.getElementById('fecha');
-  inputFecha.min = formatDate(minDate);
-  inputFecha.max = formatDate(maxDate);
-})();
-</script>
+      <section id="result-container" class="result-panel" hidden>
+        <h2>Mensaje sugerido</h2>
+        <p id="result-message"></p>
+      </section>
+    </main>
 
-      </div>
-      <div>
-        <label for="nombre">Nombre y Apellido:</label>
-        <input type="text" id="nombre" required>
-      </div>
-      <div>
-        <label for="afiliado">Num. Afiliado:</label>
-        <input type="number" id="afiliado" required>
-      </div>
-      <div>
-        <label for="codigo">Código:</label>
-        <input type="number" id="codigo" required>
-      </div>
-      <div>
-        <label for="descripcion">Descripción:</label>
-        <textarea id="descripcion" rows="2" required></textarea>
-      </div>
-      <div>
-        <label for="valor">Valor:</label>
-        <input type="number" id="valor" step="0.01" required>
-      </div>
-    </form>
-    <div class="buttons">
-      <button type="button" id="finish-btn">Finalizar</button>
-      <button type="button" id="next-btn">Siguiente</button>
-    </div>
+    <footer class="app-footer">
+      <a href="https://www.instagram.com/tc.dev" target="_blank" rel="noopener noreferrer">
+        © 2025 TCDEV
+      </a>
+    </footer>
   </div>
 
-  <div id="result-container"></div>
-
-  <footer>
-    <a href="https://www.instagram.com/tc.dev"><p style="text-align:center;font-size:0.8em;color:#666;">© 2025 TCDEV</p></a>
-  </footer>
-
   <script>
-    // Conversión de números a letras en español sin librerías externas
+    const meses = [
+      'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+      'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+    ];
+
     function numeroALetras(num) {
       const unidades = ['', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve'];
-      const especiales = ['diez','once','doce','trece','catorce','quince','dieciseis','diecisiete','dieciocho','diecinueve'];
-      const decenas = ['','','veinte','treinta','cuarenta','cincuenta','sesenta','setenta','ochenta','noventa'];
-      const centenas = ['', 'ciento','doscientos','trescientos','cuatrocientos','quinientos','seiscientos','setecientos','ochocientos','novecientos'];
+      const especiales = ['diez', 'once', 'doce', 'trece', 'catorce', 'quince', 'dieciséis', 'diecisiete', 'dieciocho', 'diecinueve'];
+      const decenas = ['', '', 'veinte', 'treinta', 'cuarenta', 'cincuenta', 'sesenta', 'setenta', 'ochenta', 'noventa'];
+      const centenas = ['', 'ciento', 'doscientos', 'trescientos', 'cuatrocientos', 'quinientos', 'seiscientos', 'setecientos', 'ochocientos', 'novecientos'];
+
       if (num === 0) return 'cero';
       if (num === 100) return 'cien';
+
       let resultado = '';
-      if (num >= 1000000) {
-        const millones = Math.floor(num/1000000);
-        resultado += (millones > 1 ? numeroALetras(millones) + ' millones' : 'un millón');
-        num %= 1000000;
+
+      if (num >= 1_000_000) {
+        const millones = Math.floor(num / 1_000_000);
+        resultado += millones > 1 ? numeroALetras(millones) + ' millones' : 'un millón';
+        num %= 1_000_000;
         if (num > 0) resultado += ' ';
       }
-      if (num >= 1000) {
-        const miles = Math.floor(num/1000);
-        resultado += (miles > 1 ? numeroALetras(miles) + ' mil' : 'mil');
-        num %= 1000;
+
+      if (num >= 1_000) {
+        const miles = Math.floor(num / 1_000);
+        resultado += miles > 1 ? numeroALetras(miles) + ' mil' : 'mil';
+        num %= 1_000;
         if (num > 0) resultado += ' ';
       }
+
       if (num >= 100) {
-        resultado += centenas[Math.floor(num/100)];
+        resultado += centenas[Math.floor(num / 100)];
         num %= 100;
         if (num > 0) resultado += ' ';
       }
+
       if (num >= 20) {
-        resultado += decenas[Math.floor(num/10)];
+        resultado += decenas[Math.floor(num / 10)];
         if (num % 10 > 0) resultado += ' y ' + unidades[num % 10];
       } else if (num >= 10) {
         resultado += especiales[num - 10];
       } else if (num > 0) {
         resultado += unidades[num];
       }
+
       return resultado;
     }
 
-    let clientCount = 1;
-    const clients = [];
-    const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    const clients = {
+      previous: [],
+      current: []
+    };
+    let activePeriod = 'previous';
+    let currentRange = null;
 
-    function getFormData() {
-      const raw = document.getElementById('fecha').value;
-      const [yy, mm, dd] = raw.split('-');
+    const clientForm = document.getElementById('client-form');
+    const formTitle = document.getElementById('form-title');
+    const dateInput = document.getElementById('fecha');
+    const dateHint = document.getElementById('fecha-hint');
+    const periodSummary = document.getElementById('period-summary');
+    const periodLabel = document.getElementById('period-label');
+    const clientList = document.getElementById('client-list');
+    const clientTotal = document.getElementById('client-total');
+    const resultPanel = document.getElementById('result-container');
+    const resultMessage = document.getElementById('result-message');
+
+    function computeRange(period) {
+      const hoy = new Date();
+      if (period === 'previous') {
+        const inicio = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
+        const fin = new Date(hoy.getFullYear(), hoy.getMonth(), 0);
+        return {
+          start: inicio,
+          end: fin,
+          monthName: meses[inicio.getMonth()],
+          year: inicio.getFullYear(),
+          description: 'Mes anterior'
+        };
+      }
+
+      const inicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+      const fin = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
       return {
-        FECHA: `${dd}/${mm}/${yy}`,
-        'NOMBRE Y APELLIDO': document.getElementById('nombre').value,
-        'NUM. AFILIADO': document.getElementById('afiliado').value,
-        CODIGO: document.getElementById('codigo').value,
-        DESCRIPCION: document.getElementById('descripcion').value,
-        VALOR: parseFloat(document.getElementById('valor').value) || 0
+        start: inicio,
+        end: fin,
+        monthName: meses[inicio.getMonth()],
+        year: inicio.getFullYear(),
+        description: 'Mes actual'
       };
     }
 
-    function resetForm() { document.getElementById('client-form').reset(); }
-    function updateTitle() { document.getElementById('title').innerText = 'Cliente ' + clientCount; document.title = 'Cliente ' + clientCount; }
+    function formatDateInput(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
 
-    document.getElementById('next-btn').addEventListener('click', () => {
+    function formatDateDisplay(date) {
+      return date.toLocaleDateString('es-AR', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric'
+      });
+    }
+
+    function formatDateSheet(iso) {
+      const [year, month, day] = iso.split('-');
+      return `${day}/${month}/${year}`;
+    }
+
+    function formatCurrency(value) {
+      return new Intl.NumberFormat('es-AR', {
+        style: 'currency',
+        currency: 'ARS'
+      }).format(value);
+    }
+
+    function setPeriod(period) {
+      activePeriod = period;
+      currentRange = computeRange(period);
+
+      document.querySelectorAll('.period-option').forEach((btn) => {
+        const isActive = btn.dataset.period === period;
+        btn.classList.toggle('is-active', isActive);
+        btn.setAttribute('aria-selected', String(isActive));
+      });
+
+      periodLabel.textContent = `${currentRange.monthName} ${currentRange.year}`;
+      periodSummary.textContent = `Podés cargar prestaciones desde el ${formatDateDisplay(currentRange.start)} hasta el ${formatDateDisplay(currentRange.end)}.`;
+
+      dateInput.min = formatDateInput(currentRange.start);
+      dateInput.max = formatDateInput(currentRange.end);
+      dateInput.value = formatDateInput(currentRange.end);
+      dateHint.textContent = `Fechas habilitadas: ${formatDateDisplay(currentRange.start)} al ${formatDateDisplay(currentRange.end)}.`;
+
+      renderClientList();
+      updateFormTitle();
+      resultPanel.hidden = true;
+      resultMessage.textContent = '';
+    }
+
+    function getFormData() {
+      const rawDate = dateInput.value;
+      const nombre = document.getElementById('nombre').value.trim();
+      const afiliado = document.getElementById('afiliado').value.trim();
+      const codigo = document.getElementById('codigo').value.trim();
+      const descripcion = document.getElementById('descripcion').value.trim();
+      const valor = parseFloat(document.getElementById('valor').value);
+
+      if (!rawDate || !nombre || !afiliado || !codigo || !descripcion || Number.isNaN(valor)) {
+        return null;
+      }
+
+      return {
+        fechaISO: rawDate,
+        nombre,
+        afiliado,
+        codigo,
+        descripcion,
+        valor
+      };
+    }
+
+    function resetForm() {
+      clientForm.reset();
+      if (currentRange) {
+        dateInput.value = formatDateInput(currentRange.end);
+      }
+      dateInput.focus({ preventScroll: true });
+    }
+
+    function updateFormTitle() {
+      const nextNumber = clients[activePeriod].length + 1;
+      formTitle.textContent = `Cliente ${nextNumber}`;
+      document.title = `Cliente ${nextNumber} · FactuExcel`;
+    }
+
+    function renderClientList() {
+      const activeClients = clients[activePeriod];
+
+      if (!activeClients.length) {
+        clientList.innerHTML = '<p class="empty-state">Todavía no cargaste ningún cliente.</p>';
+        clientTotal.textContent = formatCurrency(0);
+        return;
+      }
+
+      const items = activeClients.map((client, index) => {
+        const date = new Date(client.fechaISO + 'T00:00:00');
+        return `
+          <article class="client-card">
+            <div class="client-card__top">
+              <span class="client-index">#${String(index + 1).padStart(2, '0')}</span>
+              <time datetime="${client.fechaISO}">${formatDateDisplay(date)}</time>
+            </div>
+            <h3>${client.nombre}</h3>
+            <p class="client-meta">
+              <span>Afiliado: <strong>${client.afiliado}</strong></span>
+              <span>Código: <strong>${client.codigo}</strong></span>
+            </p>
+            <p class="client-description">${client.descripcion}</p>
+            <p class="client-value">${formatCurrency(client.valor)}</p>
+          </article>
+        `;
+      });
+
+      clientList.innerHTML = items.join('');
+
+      const total = activeClients.reduce((acc, client) => acc + client.valor, 0);
+      clientTotal.textContent = formatCurrency(total);
+    }
+
+    function isFormDirty() {
+      return Array.from(clientForm.elements)
+        .filter((el) => ['INPUT', 'TEXTAREA'].includes(el.tagName))
+        .some((el) => el.value.trim() !== '');
+    }
+
+    function addClient() {
       const data = getFormData();
-      if (!data.FECHA || !data['NOMBRE Y APELLIDO'] || !data.VALOR) {
-        alert('Completa todos los campos obligatorios.'); return;
+      if (!data) {
+        alert('Revisá que todos los campos estén completos antes de guardar.');
+        return false;
       }
-      clients.push(data);
-      clientCount++;
+
+      clients[activePeriod].push(data);
+      renderClientList();
       resetForm();
-      updateTitle();
-      document.getElementById('form-container').classList.add('fade');
-      setTimeout(() => document.getElementById('form-container').classList.remove('fade'), 300);
-    });
+      updateFormTitle();
 
-    document.getElementById('finish-btn').addEventListener('click', () => {
-      document.getElementById('next-btn').click();
-      document.getElementById('form-container').style.display = 'none';
-      const hoy = new Date();
-      const anioActual = hoy.getFullYear();
-      let mesPrevioIndex = hoy.getMonth() - 1;
-      if (mesPrevioIndex < 0) mesPrevioIndex = 11;
-      const mesPrevioNombre = meses[mesPrevioIndex];
+      clientForm.classList.add('is-saving');
+      setTimeout(() => clientForm.classList.remove('is-saving'), 250);
+      resultPanel.hidden = true;
+      resultMessage.textContent = '';
+      return true;
+    }
 
-      document.getElementById('result-container').innerText =
-        `Buenos días.\nAdjunto facturación mes de ${mesPrevioNombre}.\nTroncoso María Cristina\nNum. Prestador 107968.`;
-      document.getElementById('result-container').style.display = 'block';
+    function generateExcel() {
+      const clientsForPeriod = clients[activePeriod];
 
-      generateExcel(mesPrevioNombre, anioActual);
-    });
-
-    function generateExcel(mesNombre, anioActual) {
-      const ws = XLSX.utils.json_to_sheet(clients, { header: ['FECHA','NOMBRE Y APELLIDO','NUM. AFILIADO','CODIGO','DESCRIPCION','VALOR'] });
-      ws['!cols'] = [{wch:12},{wch:20},{wch:30},{wch:10},{wch:30},{wch:15}];
-
-      const total = clients.reduce((sum, c) => sum + c.VALOR, 0);
-      for (let i = 2; i <= clients.length + 1; i++) {
-        if (ws['F' + i]) ws['F' + i].z = '"$"#,##0.00';
-        if (ws['C' + i]) ws['C' + i].z = '@';
+      if (!clientsForPeriod.length) {
+        return;
       }
 
-      const v1 = clients.length + 2;
-      const v2 = clients.length + 3;
-      XLSX.utils.sheet_add_aoa(ws, [[]], { origin: 'A' + v1 });
-      XLSX.utils.sheet_add_aoa(ws, [[]], { origin: 'A' + v2 });
+      const headerRows = [
+        ['Troncoso María Cristina', '', '', '', '', `Facturación ${currentRange.monthName} ${currentRange.year}`],
+        ['Generado', new Date().toLocaleString('es-AR'), '', '', '', ''],
+        []
+      ];
 
-      const totalRow = clients.length + 4;
-      XLSX.utils.sheet_add_aoa(ws, [['TOTAL', total]], { origin: 'A' + totalRow });
-      ws['B' + totalRow].z = '"$"#,##0.00';
-      ws['B' + totalRow].t = 'n';
+      const sheetData = clientsForPeriod.map((client, index) => ({
+        '#': index + 1,
+        'FECHA': formatDateSheet(client.fechaISO),
+        'NOMBRE Y APELLIDO': client.nombre,
+        'NUM. AFILIADO': client.afiliado,
+        'CÓDIGO': client.codigo,
+        'DESCRIPCIÓN': client.descripcion,
+        'VALOR': client.valor
+      }));
 
-      const wordsRow = totalRow + 1;
-      const totalTxt = numeroALetras(Math.round(total));
-      XLSX.utils.sheet_add_aoa(ws, [['Total facturado:', totalTxt]], { origin: 'A' + wordsRow });
-      ws['B' + wordsRow].t = 's';
+      const ws = XLSX.utils.json_to_sheet(sheetData, {
+        header: ['#', 'FECHA', 'NOMBRE Y APELLIDO', 'NUM. AFILIADO', 'CÓDIGO', 'DESCRIPCIÓN', 'VALOR'],
+        origin: 'A4'
+      });
+
+      XLSX.utils.sheet_add_aoa(ws, headerRows, { origin: 'A1' });
+
+      const total = clientsForPeriod.reduce((sum, client) => sum + client.valor, 0);
+      const blankRowIndex = sheetData.length + 5;
+      const totalRowIndex = blankRowIndex + 1;
+      const wordsRowIndex = totalRowIndex + 1;
+
+      XLSX.utils.sheet_add_aoa(ws, [[]], { origin: `A${blankRowIndex}` });
+      XLSX.utils.sheet_add_aoa(ws, [['', '', '', '', '', 'TOTAL FACTURADO', '']], { origin: `A${totalRowIndex}` });
+      XLSX.utils.sheet_add_aoa(ws, [['', '', '', '', '', 'En letras', numeroALetras(Math.round(total))]], { origin: `A${wordsRowIndex}` });
+
+      const totalCellRef = `G${totalRowIndex}`;
+      ws[totalCellRef] = {
+        t: 'n',
+        f: `SUM(G5:G${sheetData.length + 4})`,
+        z: '"$" #,##0.00'
+      };
+
+      const wordsCellRef = `G${wordsRowIndex}`;
+      ws[wordsCellRef] = ws[wordsCellRef] || {};
+      ws[wordsCellRef].t = 's';
+
+      for (let row = 5; row < sheetData.length + 5; row += 1) {
+        const cell = ws[`G${row}`];
+        if (cell) {
+          cell.t = 'n';
+          cell.z = '"$" #,##0.00';
+        }
+      }
+
+      ws['!cols'] = [
+        { wch: 6 },
+        { wch: 12 },
+        { wch: 28 },
+        { wch: 18 },
+        { wch: 12 },
+        { wch: 40 },
+        { wch: 16 }
+      ];
 
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Facturación');
-      XLSX.writeFile(wb, `facturacion_${mesNombre}_${anioActual}.xlsx`);
+      XLSX.writeFile(wb, `facturacion_${currentRange.monthName}_${currentRange.year}.xlsx`);
     }
+
+    function showResultMessage() {
+      const total = clients[activePeriod].reduce((sum, client) => sum + client.valor, 0);
+      const formattedTotal = formatCurrency(total);
+      const message = `Buenos días.\nAdjunto facturación mes de ${currentRange.monthName} ${currentRange.year}.\nTroncoso María Cristina\nNum. Prestador 107968.\nTotal: ${formattedTotal}.`;
+
+      resultMessage.textContent = message;
+      resultPanel.hidden = false;
+      resultPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    document.querySelectorAll('.period-option').forEach((button) => {
+      button.addEventListener('click', () => {
+        if (button.dataset.period !== activePeriod) {
+          setPeriod(button.dataset.period);
+        }
+      });
+    });
+
+    document.getElementById('next-btn').addEventListener('click', () => {
+      if (clientForm.reportValidity()) {
+        addClient();
+      }
+    });
+
+    document.getElementById('finish-btn').addEventListener('click', () => {
+      if (isFormDirty()) {
+        if (!clientForm.reportValidity() || !addClient()) {
+          return;
+        }
+      }
+
+      if (!clients[activePeriod].length) {
+        alert('Necesitás agregar al menos un cliente para generar el Excel.');
+        return;
+      }
+
+      generateExcel();
+      showResultMessage();
+    });
+
+    setPeriod(activePeriod);
   </script>
 </body>
 
