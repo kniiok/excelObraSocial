@@ -4,9 +4,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0b0e19" />
   <title>FactuExcel</title>
   <link rel="shortcut icon"
-    href="https://img.icons8.com/?size=100&id=13654&format=png&color=000000" type="image/x-icon" />
+    href="logo.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
@@ -20,7 +21,7 @@
   <div class="app-shell">
     <header class="app-header">
       <div class="brand">
-        <span class="brand-mark">FE</span>
+        <img src="logo.svg" alt="FactuExcel" class="brand-logo" loading="lazy" width="128" height="128" />
         <div class="brand-copy">
           <p class="brand-kicker">Gestión médica</p>
           <h1>FactuExcel</h1>
@@ -124,6 +125,11 @@
       'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
     ];
 
+    function capitalize(text) {
+      if (!text) return '';
+      return text.charAt(0).toUpperCase() + text.slice(1);
+    }
+
     function numeroALetras(num) {
       const unidades = ['', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve'];
       const especiales = ['diez', 'once', 'doce', 'trece', 'catorce', 'quince', 'dieciséis', 'diecisiete', 'dieciocho', 'diecinueve'];
@@ -225,9 +231,9 @@
       });
     }
 
-    function formatDateSheet(iso) {
-      const [year, month, day] = iso.split('-');
-      return `${day}/${month}/${year}`;
+    function toExcelDate(iso) {
+      const [year, month, day] = iso.split('-').map(Number);
+      return new Date(year, month - 1, day);
     }
 
     function formatCurrency(value) {
@@ -247,7 +253,7 @@
         btn.setAttribute('aria-selected', String(isActive));
       });
 
-      periodLabel.textContent = `${currentRange.monthName} ${currentRange.year}`;
+      periodLabel.textContent = `${capitalize(currentRange.monthName)} ${currentRange.year}`;
       periodSummary.textContent = `Podés cargar prestaciones desde el ${formatDateDisplay(currentRange.start)} hasta el ${formatDateDisplay(currentRange.end)}.`;
 
       dateInput.min = formatDateInput(currentRange.start);
@@ -309,7 +315,7 @@
       const items = activeClients.map((client, index) => {
         const date = new Date(client.fechaISO + 'T00:00:00');
         return `
-          <article class="client-card">
+          <article class="client-card" tabindex="0">
             <div class="client-card__top">
               <span class="client-index">#${String(index + 1).padStart(2, '0')}</span>
               <time datetime="${client.fechaISO}">${formatDateDisplay(date)}</time>
@@ -363,15 +369,17 @@
         return;
       }
 
+      const now = new Date();
       const headerRows = [
-        ['Troncoso María Cristina', '', '', '', '', `Facturación ${currentRange.monthName} ${currentRange.year}`],
-        ['Generado', new Date().toLocaleString('es-AR'), '', '', '', ''],
-        []
+        ['Troncoso María Cristina', '', '', '', '', '', `Facturación ${capitalize(currentRange.monthName)} ${currentRange.year}`],
+        ['Periodo', `${formatDateDisplay(currentRange.start)} al ${formatDateDisplay(currentRange.end)}`, '', '', '', '', ''],
+        ['Generado', now.toLocaleString('es-AR'), '', '', '', '', ''],
+        ['Obra social', 'FactuExcel', '', '', '', '', '']
       ];
 
       const sheetData = clientsForPeriod.map((client, index) => ({
         '#': index + 1,
-        'FECHA': formatDateSheet(client.fechaISO),
+        'FECHA': toExcelDate(client.fechaISO),
         'NOMBRE Y APELLIDO': client.nombre,
         'NUM. AFILIADO': client.afiliado,
         'CÓDIGO': client.codigo,
@@ -381,48 +389,212 @@
 
       const ws = XLSX.utils.json_to_sheet(sheetData, {
         header: ['#', 'FECHA', 'NOMBRE Y APELLIDO', 'NUM. AFILIADO', 'CÓDIGO', 'DESCRIPCIÓN', 'VALOR'],
-        origin: 'A4'
+        origin: 'A6'
       });
 
       XLSX.utils.sheet_add_aoa(ws, headerRows, { origin: 'A1' });
 
-      const total = clientsForPeriod.reduce((sum, client) => sum + client.valor, 0);
-      const blankRowIndex = sheetData.length + 5;
+      const tableHeaderRow = 6;
+      const dataStartRow = tableHeaderRow + 1;
+      const dataEndRow = dataStartRow + sheetData.length - 1;
+      const blankRowIndex = dataEndRow + 1;
       const totalRowIndex = blankRowIndex + 1;
       const wordsRowIndex = totalRowIndex + 1;
 
       XLSX.utils.sheet_add_aoa(ws, [[]], { origin: `A${blankRowIndex}` });
       XLSX.utils.sheet_add_aoa(ws, [['', '', '', '', '', 'TOTAL FACTURADO', '']], { origin: `A${totalRowIndex}` });
-      XLSX.utils.sheet_add_aoa(ws, [['', '', '', '', '', 'En letras', numeroALetras(Math.round(total))]], { origin: `A${wordsRowIndex}` });
 
+      const total = clientsForPeriod.reduce((sum, client) => sum + client.valor, 0);
+      const currencyFormat = '[$ARS] #,##0.00';
       const totalCellRef = `G${totalRowIndex}`;
       ws[totalCellRef] = {
         t: 'n',
-        f: `SUM(G5:G${sheetData.length + 4})`,
-        z: '"$" #,##0.00'
+        f: `SUM(G${dataStartRow}:G${dataEndRow})`,
+        z: currencyFormat
       };
 
-      const wordsCellRef = `G${wordsRowIndex}`;
-      ws[wordsCellRef] = ws[wordsCellRef] || {};
-      ws[wordsCellRef].t = 's';
+      const integerPart = Math.floor(total);
+      const cents = Math.round((total - integerPart) * 100);
+      const baseWords = numeroALetras(integerPart);
+      const wordsText = `${baseWords.charAt(0).toUpperCase()}${baseWords.slice(1)} pesos${cents ? ` con ${String(cents).padStart(2, '0')} centavos` : ''}.`;
 
-      for (let row = 5; row < sheetData.length + 5; row += 1) {
-        const cell = ws[`G${row}`];
-        if (cell) {
-          cell.t = 'n';
-          cell.z = '"$" #,##0.00';
+      XLSX.utils.sheet_add_aoa(ws, [['', '', '', '', '', 'En letras', wordsText]], { origin: `A${wordsRowIndex}` });
+
+      const wordsCellRef = `G${wordsRowIndex}`;
+      ws[wordsCellRef] = ws[wordsCellRef] || { t: 's', v: wordsText };
+      ws[wordsCellRef].t = 's';
+      ws[wordsCellRef].v = wordsText;
+
+      const columnKeys = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
+      const brandColor = '4C57FF';
+      const softBorderColor = 'E2E8F0';
+      const zebraRows = ['F8FAFC', 'EEF2FF'];
+
+      const createBorder = (style = 'thin', color = softBorderColor) => ({
+        top: { style, color: { rgb: color } },
+        right: { style, color: { rgb: color } },
+        bottom: { style, color: { rgb: color } },
+        left: { style, color: { rgb: color } }
+      });
+
+      const styleCell = (ref, style) => {
+        if (!ws[ref]) {
+          return;
         }
-      }
+        ws[ref].s = style;
+      };
+
+      styleCell('A1', {
+        font: { name: 'Poppins', sz: 18, bold: true, color: { rgb: '0B0E19' } },
+        alignment: { horizontal: 'left', vertical: 'center' }
+      });
+      styleCell('G1', {
+        font: { name: 'Poppins', sz: 14, bold: true, color: { rgb: brandColor } },
+        alignment: { horizontal: 'right', vertical: 'center' }
+      });
+
+      ['A2', 'A3', 'A4'].forEach((ref) => {
+        styleCell(ref, {
+          font: { name: 'Work Sans', sz: 11, bold: true, color: { rgb: '475569' } },
+          alignment: { horizontal: 'left', vertical: 'center' }
+        });
+      });
+
+      ['B2', 'B3', 'B4'].forEach((ref) => {
+        styleCell(ref, {
+          font: { name: 'Work Sans', sz: 11, color: { rgb: '0F172A' } },
+          alignment: { horizontal: 'left', vertical: 'center' }
+        });
+      });
+
+      ws['!merges'] = [
+        ...(ws['!merges'] || []),
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } },
+        { s: { r: 1, c: 1 }, e: { r: 1, c: 6 } },
+        { s: { r: 2, c: 1 }, e: { r: 2, c: 6 } },
+        { s: { r: 3, c: 1 }, e: { r: 3, c: 6 } }
+      ];
+
+      const tableHeaderStyle = {
+        font: { name: 'Poppins', sz: 11, bold: true, color: { rgb: 'FFFFFF' } },
+        alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+        fill: { patternType: 'solid', fgColor: { rgb: brandColor } },
+        border: createBorder()
+      };
+
+      columnKeys.forEach((column, index) => {
+        const headerRef = `${column}${tableHeaderRow}`;
+        styleCell(headerRef, tableHeaderStyle);
+        if (ws[headerRef] && ws[headerRef].s) {
+          ws[headerRef].s.alignment = {
+            horizontal: index <= 1 ? 'center' : index === columnKeys.length - 1 ? 'right' : 'left',
+            vertical: 'center',
+            wrapText: true
+          };
+        }
+      });
+
+      clientsForPeriod.forEach((client, rowIndex) => {
+        const rowNumber = dataStartRow + rowIndex;
+        const fillColor = zebraRows[rowIndex % zebraRows.length];
+        columnKeys.forEach((column, columnIndex) => {
+          const ref = `${column}${rowNumber}`;
+          if (!ws[ref]) {
+            return;
+          }
+          const alignment = columnIndex === 0
+            ? 'center'
+            : columnIndex === columnKeys.length - 1
+              ? 'right'
+              : columnIndex === 1
+                ? 'center'
+                : 'left';
+          ws[ref].s = {
+            font: { name: 'Work Sans', sz: 11, color: { rgb: '0F172A' } },
+            alignment: { horizontal: alignment, vertical: 'center', wrapText: columnIndex === 5 },
+            fill: { patternType: 'solid', fgColor: { rgb: fillColor } },
+            border: createBorder()
+          };
+          if (column === 'B') {
+            ws[ref].z = 'dd/mm/yyyy';
+          }
+          if (column === 'G') {
+            ws[ref].z = currencyFormat;
+          }
+        });
+      });
+
+      styleCell(`F${totalRowIndex}`, {
+        font: { name: 'Poppins', sz: 11, bold: true, color: { rgb: '1E293B' } },
+        alignment: { horizontal: 'right', vertical: 'center' },
+        fill: { patternType: 'solid', fgColor: { rgb: 'E0E7FF' } },
+        border: {
+          top: { style: 'medium', color: { rgb: brandColor } },
+          right: { style: 'thin', color: { rgb: softBorderColor } },
+          bottom: { style: 'thin', color: { rgb: softBorderColor } },
+          left: { style: 'thin', color: { rgb: softBorderColor } }
+        }
+      });
+
+      styleCell(totalCellRef, {
+        font: { name: 'Poppins', sz: 12, bold: true, color: { rgb: '0B0E19' } },
+        alignment: { horizontal: 'right', vertical: 'center' },
+        fill: { patternType: 'solid', fgColor: { rgb: 'C7D2FE' } },
+        border: {
+          top: { style: 'medium', color: { rgb: brandColor } },
+          right: { style: 'thin', color: { rgb: softBorderColor } },
+          bottom: { style: 'thin', color: { rgb: softBorderColor } },
+          left: { style: 'thin', color: { rgb: softBorderColor } }
+        }
+      });
+      ws[totalCellRef].z = currencyFormat;
+
+      styleCell(`F${wordsRowIndex}`, {
+        font: { name: 'Work Sans', sz: 10, bold: true, color: { rgb: '475569' } },
+        alignment: { horizontal: 'right', vertical: 'center' },
+        fill: { patternType: 'solid', fgColor: { rgb: 'F8FAFC' } }
+      });
+
+      styleCell(wordsCellRef, {
+        font: { name: 'Work Sans', sz: 10, color: { rgb: '475569' } },
+        alignment: { horizontal: 'left', vertical: 'center', wrapText: true },
+        fill: { patternType: 'solid', fgColor: { rgb: 'F8FAFC' } },
+        border: {
+          top: { style: 'thin', color: { rgb: softBorderColor } },
+          right: { style: 'thin', color: { rgb: softBorderColor } },
+          bottom: { style: 'thin', color: { rgb: softBorderColor } },
+          left: { style: 'thin', color: { rgb: softBorderColor } }
+        }
+      });
 
       ws['!cols'] = [
         { wch: 6 },
-        { wch: 12 },
-        { wch: 28 },
-        { wch: 18 },
-        { wch: 12 },
-        { wch: 40 },
-        { wch: 16 }
+        { wch: 14 },
+        { wch: 34 },
+        { wch: 20 },
+        { wch: 14 },
+        { wch: 46 },
+        { wch: 18 }
       ];
+
+      ws['!rows'] = ws['!rows'] || [];
+      ws['!rows'][0] = { hpt: 30 };
+      ws['!rows'][1] = { hpt: 20 };
+      ws['!rows'][2] = { hpt: 18 };
+      ws['!rows'][3] = { hpt: 18 };
+      ws['!rows'][4] = { hpt: 8 };
+      ws['!rows'][tableHeaderRow - 1] = { hpt: 28 };
+      ws['!rows'][totalRowIndex - 1] = { hpt: 26 };
+      ws['!rows'][wordsRowIndex - 1] = { hpt: 34 };
+
+      ws['!pane'] = {
+        ySplit: tableHeaderRow,
+        topLeftCell: `A${tableHeaderRow + 1}`,
+        activePane: 'bottomLeft',
+        state: 'frozen'
+      };
+
+      ws['!autofilter'] = { ref: `A${tableHeaderRow}:G${dataEndRow}` };
 
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Facturación');
@@ -432,7 +604,7 @@
     function showResultMessage() {
       const total = clients[activePeriod].reduce((sum, client) => sum + client.valor, 0);
       const formattedTotal = formatCurrency(total);
-      const message = `Buenos días.\nAdjunto facturación mes de ${currentRange.monthName} ${currentRange.year}.\nTroncoso María Cristina\nNum. Prestador 107968.\nTotal: ${formattedTotal}.`;
+      const message = `Buenos días.\nAdjunto facturación mes de ${capitalize(currentRange.monthName)} ${currentRange.year}.\nTroncoso María Cristina\nNum. Prestador 107968.\nTotal: ${formattedTotal}.`;
 
       resultMessage.textContent = message;
       resultPanel.hidden = false;
