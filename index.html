@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FactuExcel</title>
+  <link rel="shortcut icon" href="https://img.icons8.com/?size=100&id=13654&format=png&color=000000" type="image/x-icon">
+
+  <!-- Incluimos SheetJS para crear el Excel -->
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+  <div id="form-container">
+    <h1 id="title">Cliente 1</h1>
+    <form id="client-form">
+      <div>
+        <label for="fecha">Fecha:</label>
+        <input type="date" id="fecha" required>
+<script>
+(function () {
+  const hoy = new Date();
+  let year = hoy.getFullYear();
+  let month = hoy.getMonth(); // 0 = enero
+
+  if (month === 0) {
+    month = 11;
+    year -= 1;
+  } else {
+    month -= 1;
+  }
+
+  const minDate = new Date(year, month, 1);
+  const maxDate = new Date(year, month + 1, 0);
+
+  function formatDate(d) {
+    const m = (d.getMonth() + 1).toString().padStart(2, '0');
+    const day = d.getDate().toString().padStart(2, '0');
+    return `${d.getFullYear()}-${m}-${day}`;
+  }
+
+  const inputFecha = document.getElementById('fecha');
+  inputFecha.min = formatDate(minDate);
+  inputFecha.max = formatDate(maxDate);
+})();
+</script>
+
+      </div>
+      <div>
+        <label for="nombre">Nombre y Apellido:</label>
+        <input type="text" id="nombre" required>
+      </div>
+      <div>
+        <label for="afiliado">Num. Afiliado:</label>
+        <input type="number" id="afiliado" required>
+      </div>
+      <div>
+        <label for="codigo">Código:</label>
+        <input type="number" id="codigo" required>
+      </div>
+      <div>
+        <label for="descripcion">Descripción:</label>
+        <textarea id="descripcion" rows="2" required></textarea>
+      </div>
+      <div>
+        <label for="valor">Valor:</label>
+        <input type="number" id="valor" step="0.01" required>
+      </div>
+    </form>
+    <div class="buttons">
+      <button type="button" id="finish-btn">Finalizar</button>
+      <button type="button" id="next-btn">Siguiente</button>
+    </div>
+  </div>
+
+  <div id="result-container"></div>
+
+  <footer>
+    <a href="https://www.instagram.com/tc.dev"><p style="text-align:center;font-size:0.8em;color:#666;">© 2025 TCDEV</p></a>
+  </footer>
+
+  <script>
+    // Conversión de números a letras en español sin librerías externas
+    function numeroALetras(num) {
+      const unidades = ['', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve'];
+      const especiales = ['diez','once','doce','trece','catorce','quince','dieciseis','diecisiete','dieciocho','diecinueve'];
+      const decenas = ['','','veinte','treinta','cuarenta','cincuenta','sesenta','setenta','ochenta','noventa'];
+      const centenas = ['', 'ciento','doscientos','trescientos','cuatrocientos','quinientos','seiscientos','setecientos','ochocientos','novecientos'];
+      if (num === 0) return 'cero';
+      if (num === 100) return 'cien';
+      let resultado = '';
+      if (num >= 1000000) {
+        const millones = Math.floor(num/1000000);
+        resultado += (millones > 1 ? numeroALetras(millones) + ' millones' : 'un millón');
+        num %= 1000000;
+        if (num > 0) resultado += ' ';
+      }
+      if (num >= 1000) {
+        const miles = Math.floor(num/1000);
+        resultado += (miles > 1 ? numeroALetras(miles) + ' mil' : 'mil');
+        num %= 1000;
+        if (num > 0) resultado += ' ';
+      }
+      if (num >= 100) {
+        resultado += centenas[Math.floor(num/100)];
+        num %= 100;
+        if (num > 0) resultado += ' ';
+      }
+      if (num >= 20) {
+        resultado += decenas[Math.floor(num/10)];
+        if (num % 10 > 0) resultado += ' y ' + unidades[num % 10];
+      } else if (num >= 10) {
+        resultado += especiales[num - 10];
+      } else if (num > 0) {
+        resultado += unidades[num];
+      }
+      return resultado;
+    }
+
+    let clientCount = 1;
+    const clients = [];
+    const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+    function getFormData() {
+      const raw = document.getElementById('fecha').value;
+      const [yy, mm, dd] = raw.split('-');
+      return {
+        FECHA: `${dd}/${mm}/${yy}`,
+        'NOMBRE Y APELLIDO': document.getElementById('nombre').value,
+        'NUM. AFILIADO': document.getElementById('afiliado').value,
+        CODIGO: document.getElementById('codigo').value,
+        DESCRIPCION: document.getElementById('descripcion').value,
+        VALOR: parseFloat(document.getElementById('valor').value) || 0
+      };
+    }
+
+    function resetForm() { document.getElementById('client-form').reset(); }
+    function updateTitle() { document.getElementById('title').innerText = 'Cliente ' + clientCount; document.title = 'Cliente ' + clientCount; }
+
+    document.getElementById('next-btn').addEventListener('click', () => {
+      const data = getFormData();
+      if (!data.FECHA || !data['NOMBRE Y APELLIDO'] || !data.VALOR) {
+        alert('Completa todos los campos obligatorios.'); return;
+      }
+      clients.push(data);
+      clientCount++;
+      resetForm();
+      updateTitle();
+      document.getElementById('form-container').classList.add('fade');
+      setTimeout(() => document.getElementById('form-container').classList.remove('fade'), 300);
+    });
+
+    document.getElementById('finish-btn').addEventListener('click', () => {
+      document.getElementById('next-btn').click();
+      document.getElementById('form-container').style.display = 'none';
+      const hoy = new Date();
+      const anioActual = hoy.getFullYear();
+      let mesPrevioIndex = hoy.getMonth() - 1;
+      if (mesPrevioIndex < 0) mesPrevioIndex = 11;
+      const mesPrevioNombre = meses[mesPrevioIndex];
+
+      document.getElementById('result-container').innerText =
+        `Buenos días.\nAdjunto facturación mes de ${mesPrevioNombre}.\nTroncoso María Cristina\nNum. Prestador 107968.`;
+      document.getElementById('result-container').style.display = 'block';
+
+      generateExcel(mesPrevioNombre, anioActual);
+    });
+
+    function generateExcel(mesNombre, anioActual) {
+      const ws = XLSX.utils.json_to_sheet(clients, { header: ['FECHA','NOMBRE Y APELLIDO','NUM. AFILIADO','CODIGO','DESCRIPCION','VALOR'] });
+      ws['!cols'] = [{wch:12},{wch:20},{wch:30},{wch:10},{wch:30},{wch:15}];
+
+      const total = clients.reduce((sum, c) => sum + c.VALOR, 0);
+      for (let i = 2; i <= clients.length + 1; i++) {
+        if (ws['F' + i]) ws['F' + i].z = '"$"#,##0.00';
+        if (ws['C' + i]) ws['C' + i].z = '@';
+      }
+
+      const v1 = clients.length + 2;
+      const v2 = clients.length + 3;
+      XLSX.utils.sheet_add_aoa(ws, [[]], { origin: 'A' + v1 });
+      XLSX.utils.sheet_add_aoa(ws, [[]], { origin: 'A' + v2 });
+
+      const totalRow = clients.length + 4;
+      XLSX.utils.sheet_add_aoa(ws, [['TOTAL', total]], { origin: 'A' + totalRow });
+      ws['B' + totalRow].z = '"$"#,##0.00';
+      ws['B' + totalRow].t = 'n';
+
+      const wordsRow = totalRow + 1;
+      const totalTxt = numeroALetras(Math.round(total));
+      XLSX.utils.sheet_add_aoa(ws, [['Total facturado:', totalTxt]], { origin: 'A' + wordsRow });
+      ws['B' + wordsRow].t = 's';
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Facturación');
+      XLSX.writeFile(wb, `facturacion_${mesNombre}_${anioActual}.xlsx`);
+    }
+  </script>
+</body>
+
+</html>
