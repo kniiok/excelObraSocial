@@ -242,18 +242,6 @@
       })[char]);
     }
 
-    function sanitizeText(value) {
-      if (value === null || value === undefined) {
-        return '';
-      }
-
-      return String(value)
-        .normalize('NFC')
-        .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-    }
-
     function numeroALetras(num) {
       const unidades = ['', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve'];
       const especiales = ['diez', 'once', 'doce', 'trece', 'catorce', 'quince', 'dieciséis', 'diecisiete', 'dieciocho', 'diecinueve'];
@@ -594,36 +582,14 @@
         return;
       }
 
-      const workbook = XLSX.read(EXCEL_TEMPLATE_BASE64, {
-        type: 'base64',
-        cellStyles: true
-      });
+      const workbook = XLSX.read(EXCEL_TEMPLATE_BASE64, { type: 'base64' });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-
-      const baseStyles = {
-        date: deepCloneStyle(worksheet['A2']?.s),
-        name: deepCloneStyle(worksheet['B2']?.s),
-        affiliate: deepCloneStyle(worksheet['C2']?.s),
-        code: deepCloneStyle(worksheet['D2']?.s),
-        description: deepCloneStyle(worksheet['E2']?.s),
-        amount: deepCloneStyle(worksheet['F2']?.s),
-        totalLabel: deepCloneStyle(worksheet['A6']?.s),
-        totalValue: deepCloneStyle(worksheet['B6']?.s),
-        wordsLabel: deepCloneStyle(worksheet['A7']?.s),
-        wordsValue: deepCloneStyle(worksheet['B7']?.s)
-      };
-
-      const baseFormats = {
-        amount: worksheet['F2']?.z,
-        total: worksheet['B6']?.z
-      };
 
       const dataStartRow = 2;
       const addressPattern = /^([A-Z]+)(\d+)$/;
 
       Object.keys(worksheet).forEach((address) => {
-        if (address.startsWith('!')) return;
         const match = addressPattern.exec(address);
         if (!match) return;
         const rowIndex = Number(match[2]);
@@ -632,81 +598,43 @@
         }
       });
 
-      const sortedClients = clientsForPeriod
-        .map((client) => ({
-          ...client,
-          nombre: sanitizeText(client.nombre),
-          afiliado: sanitizeText(client.afiliado),
-          codigo: sanitizeText(client.codigo),
-          descripcion: sanitizeText(client.descripcion),
-          valor: roundCurrency(client.valor)
-        }))
-        .sort((a, b) => {
-          if (a.fechaISO === b.fechaISO) {
-            return a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' });
-          }
-          return a.fechaISO.localeCompare(b.fechaISO);
-        });
-
-      sortedClients.forEach((client, index) => {
+      clientsForPeriod.forEach((client, index) => {
         const targetRow = dataStartRow + index;
-        setCell(worksheet, `A${targetRow}`, 's', formatExcelDateFromISO(client.fechaISO), baseStyles.date);
-        setCell(worksheet, `B${targetRow}`, 's', client.nombre, baseStyles.name);
-        setCell(worksheet, `C${targetRow}`, 's', client.afiliado, baseStyles.affiliate);
-        setCell(worksheet, `D${targetRow}`, 's', client.codigo, baseStyles.code);
-        setCell(worksheet, `E${targetRow}`, 's', client.descripcion, baseStyles.description);
-
-        const amountCell = {
-          t: 'n',
-          v: roundCurrency(client.valor)
-        };
-        if (baseStyles.amount) {
-          amountCell.s = deepCloneStyle(baseStyles.amount);
-        }
-        if (baseFormats.amount) {
-          amountCell.z = baseFormats.amount;
-        }
-        worksheet[`F${targetRow}`] = amountCell;
+        worksheet[`A${targetRow}`] = { t: 's', v: formatExcelDateFromISO(client.fechaISO) };
+        worksheet[`B${targetRow}`] = { t: 's', v: client.nombre };
+        worksheet[`C${targetRow}`] = { t: 's', v: client.afiliado, s: 1 };
+        worksheet[`D${targetRow}`] = { t: 's', v: client.codigo };
+        worksheet[`E${targetRow}`] = { t: 's', v: client.descripcion };
+        worksheet[`F${targetRow}`] = { t: 'n', v: Math.round(client.valor * 100) / 100, s: 2 };
       });
 
-      const dataEndRow = dataStartRow + sortedClients.length - 1;
+      const dataEndRow = dataStartRow + clientsForPeriod.length - 1;
       const totalRowIndex = dataEndRow + 3;
       const wordsRowIndex = totalRowIndex + 1;
 
-      setCell(worksheet, `A${totalRowIndex}`, 's', 'TOTAL', baseStyles.totalLabel);
-
-      const totalCell = {
+      worksheet[`A${totalRowIndex}`] = { t: 's', v: 'TOTAL' };
+      worksheet[`B${totalRowIndex}`] = {
         t: 'n',
-        f: `SUM(F${dataStartRow}:F${dataEndRow})`
+        f: `SUM(F${dataStartRow}:F${dataEndRow})`,
+        s: 2
       };
-      if (baseStyles.totalValue) {
-        totalCell.s = deepCloneStyle(baseStyles.totalValue);
-      }
-      if (baseFormats.total) {
-        totalCell.z = baseFormats.total;
-      }
-      worksheet[`B${totalRowIndex}`] = totalCell;
 
-      const total = sortedClients.reduce((sum, client) => sum + client.valor, 0);
-      const roundedTotal = roundCurrency(total);
+      const total = clientsForPeriod.reduce((sum, client) => sum + client.valor, 0);
+      const roundedTotal = Math.round(total * 100) / 100;
       const integerPart = Math.floor(roundedTotal);
       const cents = Math.round((roundedTotal - integerPart) * 100);
       const wordsBase = numeroALetras(integerPart);
-      const currencyWord = integerPart === 1 ? 'peso' : 'pesos';
-      const centsWord = cents === 1 ? 'centavo' : 'centavos';
       const wordsText = cents
-        ? `${capitalize(wordsBase)} ${currencyWord} con ${String(cents).padStart(2, '0')} ${centsWord}`
-        : `${capitalize(wordsBase)} ${currencyWord}`;
+        ? `${wordsBase} con ${String(cents).padStart(2, '0')} centavos`
+        : wordsBase;
 
-      const formattedWordsText = sanitizeText(wordsText);
-
-      setCell(worksheet, `A${wordsRowIndex}`, 's', 'Total facturado:', baseStyles.wordsLabel);
-      setCell(worksheet, `B${wordsRowIndex}`, 's', formattedWordsText, baseStyles.wordsValue);
+      worksheet[`A${wordsRowIndex}`] = { t: 's', v: 'Total facturado:' };
+      worksheet[`B${wordsRowIndex}`] = { t: 's', v: wordsText };
 
       worksheet['!ref'] = `A1:F${wordsRowIndex}`;
 
       const filename = `facturacion_${currentRange.monthName}_${currentRange.year}.xlsx`;
-      XLSX.writeFile(workbook, filename, { compression: true });
+      XLSX.writeFile(workbook, filename);
     }
 
     function showResultMessage() {
